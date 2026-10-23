@@ -40,12 +40,13 @@
       loop_control:
         label: "{{ item.nom }} ({{ item.port }})"
 
-    - name: Interroger l'EWS en HTTP (verifier l'acces admin)
+    - name: Interroger l'EWS en HTTP (verifier la redirection vers HTTPS)
       ansible.builtin.uri:
         url: "http://{{ printer_ip }}/"
         method: GET
         timeout: 5
         validate_certs: false
+        follow_redirects: none
         status_code: [200, 301, 302, 401, 403]
       register: ews_http
       failed_when: false
@@ -80,10 +81,12 @@
     - name: Afficher l'etat de l'acces EWS
       ansible.builtin.debug:
         msg: >-
-          EWS HTTP joignable (code {{ ews_http.status | default('n/a') }}).
-          {{ 'Interface admin accessible sans redirection vers authentification.'
-             if ews_http.status | default(0) == 200
-             else 'Reponse recue, verifier si un mot de passe est demande.' }}
+          EWS HTTP code {{ ews_http.status | default('n/a') }}.
+          {{ 'Redirection vers HTTPS active (bon) : ' + (ews_http.location | default(''))
+             if ews_http.status | default(0) in [301, 302]
+             else ('Interface admin servie en clair sur HTTP (pas de redirection HTTPS).'
+                   if ews_http.status | default(0) == 200
+                   else 'Reponse recue, a verifier manuellement.') }}
       when: ews_http.status is defined
 
     - name: Afficher l'etat SNMP

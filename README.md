@@ -39,9 +39,9 @@ Services généralement exposés sur le réseau en sortie d'usine :
 
 Les protocoles d'administration à distance type Telnet et FTP ne sont normalement pas présents sur ce modèle grand public, mais restent à vérifier lors du scan.
 
-## Résultats du scan
+## Résultats du scan initial
 
-Scan réalisé le 23/10/2026 avec le playbook Ansible fourni, contre l'imprimante sur le réseau local.
+Scan réalisé le 23/10/2026 avec le playbook Ansible fourni, contre l'imprimante sur le réseau local, avant toute correction.
 
 | Service | Port | État |
 |---|---|---|
@@ -97,6 +97,24 @@ Par ordre de priorité :
 6. Désactiver les services web HP et l'impression cloud si non utilisés.
 7. Isoler l'imprimante sur un réseau invité ou un VLAN dédié, séparé des postes principaux.
 8. Désactiver WPS sur le routeur.
+
+## Après correction
+
+Corrections appliquées le 23/10/2026 via l'interface web de l'imprimante, puis nouveau scan de contrôle.
+
+Corrigé :
+
+* **Mot de passe administrateur défini.** L'EWS demande désormais une authentification (vérifié manuellement : une fenêtre de connexion apparaît à l'accès).
+* **HP ePrint et impression cloud désactivés.** Plus d'exposition de l'imprimante à des travaux venant d'Internet.
+* **Redirection HTTPS activée.** Le port 80 renvoie maintenant un code 301 vers `https://`, et la version HTTPS envoie un en-tête `Strict-Transport-Security`. Confirmé par le scan : `EWS HTTP code 301. Redirection vers HTTPS active`.
+* **Wi-Fi Direct.** Déjà désactivé à l'état initial, donc aucune action nécessaire.
+
+Points résiduels (non corrigeables sur ce modèle) :
+
+* **SNMP en communauté `public`.** Ce modèle grand public n'expose aucun réglage SNMP dans son interface, l'agent ne peut donc pas être désactivé ni reconfiguré sur l'appareil. Mitigation : isolation réseau (réseau invité ou VLAN dédié) et filtrage, pour limiter qui peut l'interroger.
+* **Ports d'impression 9100 et 631 ouverts.** Nécessaires au fonctionnement de l'impression en réseau. Même mitigation par isolation réseau.
+
+Limite de l'audit automatisé : un scan réseau voit les ports et les redirections, mais pas l'authentification de l'interface (connexion par formulaire, pas par code HTTP). La mise en place du mot de passe admin a donc été vérifiée manuellement, pas par le playbook. C'est une limite normale de ce type d'outil, à garder en tête.
 
 ## Automatisation
 
