@@ -39,6 +39,28 @@ Services généralement exposés sur le réseau en sortie d'usine :
 
 Les protocoles d'administration à distance type Telnet et FTP ne sont normalement pas présents sur ce modèle grand public, mais restent à vérifier lors du scan.
 
+## Résultats du scan
+
+Scan réalisé le 23/10/2026 avec le playbook Ansible fourni, contre l'imprimante sur le réseau local.
+
+| Service | Port | État |
+|---|---|---|
+| EWS HTTP | 80/tcp | Ouvert |
+| EWS HTTPS | 443/tcp | Ouvert |
+| Impression brute (RAW/JetDirect) | 9100/tcp | Ouvert |
+| IPP | 631/tcp | Ouvert |
+| LPD | 515/tcp | Fermé |
+| Telnet | 23/tcp | Fermé |
+| FTP | 21/tcp | Fermé |
+
+Observations confirmées :
+
+* L'interface d'administration HTTP répond en code 200 sans redirection vers une page d'authentification. L'accès admin n'est donc protégé par aucun mot de passe.
+* L'agent SNMP répond à la communauté par défaut `public`, ce qui confirme la divulgation d'informations.
+* Les protocoles legacy LPD, Telnet et FTP sont bien fermés, ce qui est le comportement attendu.
+
+Les quatre ports ouverts et l'accès admin non protégé constituent les points à traiter en priorité.
+
 ## Constats
 
 ### Priorité haute
@@ -51,9 +73,9 @@ Les protocoles d'administration à distance type Telnet et FTP ne sont normaleme
 
 ### Priorité moyenne
 
-4. **Impression non authentifiée (ports 9100, 631, 515).** N'importe quel appareil du réseau peut envoyer des travaux d'impression, ce qui permet gaspillage de consommables, déni de service local ou envoi de contenu indésirable.
+4. **Impression non authentifiée (ports 9100 et 631 ouverts).** N'importe quel appareil du réseau peut envoyer des travaux d'impression, ce qui permet gaspillage de consommables, déni de service local ou envoi de contenu indésirable.
 
-5. **SNMP en communauté publique.** Si l'agent répond à la communauté par défaut, il divulgue des informations sur le matériel et sa configuration.
+5. **SNMP en communauté publique (confirmé).** L'agent répond à la communauté par défaut `public` et divulgue des informations sur le matériel et sa configuration.
 
 6. **Services web HP et impression cloud.** L'impression cloud attribue une adresse e-mail à l'imprimante et l'expose à des travaux venant d'Internet. À désactiver si non utilisée.
 
