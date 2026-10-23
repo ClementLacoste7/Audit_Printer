@@ -1,0 +1,100 @@
+---
+# Audit de surface d'attaque - HP ENVY 5000 series
+# Verifications en lecture seule contre l'imprimante.
+# Ne modifie rien sur la cible. Test de ports et de services exposes.
+
+- name: Audit de securite de l'imprimante
+  hosts: local
+  gather_facts: false
+
+  vars:
+    ports_tcp:
+      - { port: 80, nom: "EWS HTTP (admin)" }
+      - { port: 443, nom: "EWS HTTPS (admin)" }
+      - { port: 9100, nom: "Impression brute RAW/JetDirect" }
+      - { port: 631, nom: "IPP" }
+      - { port: 515, nom: "LPD (legacy)" }
+      - { port: 23, nom: "Telnet (ne devrait pas etre ouvert)" }
+      - { port: 21, nom: "FTP (ne devrait pas etre ouvert)" }
+
+  tasks:
+
+    - name: Verifier que l'imprimante repond
+      ansible.builtin.wait_for:
+        host: "{{ printer_ip }}"
+        port: 80
+        timeout: 5
+        state: started
+      register: ping_ews
+      failed_when: false
+
+    - name: Tester les ports TCP exposes
+      ansible.builtin.wait_for:
+        host: "{{ printer_ip }}"
+        port: "{{ item.port }}"
+        timeout: 3
+        state: started
+      register: resultats_ports
+      failed_when: false
+      loop: "{{ ports_tcp }}"
+      loop_control:
+        label: "{{ item.nom }} ({{ item.port }})"
+
+    - name: Interroger l'EWS en HTTP (verifier l'acces admin)
+      ansible.builtin.uri:
+        url: "http://{{ printer_ip }}/"
+        method: GET
+        timeout: 5
+        validate_certs: false
+        status_code: [200, 301, 302, 401, 403]
+      register: ews_http
+      failed_when: false
+
+    - name: Tester la reponse SNMP en communaute par defaut
+      ansible.builtin.command: >
+        snmpget -v2c -c {{ snmp_community }} -t 2 -r 1
+        {{ printer_ip }} 1.3.6.1.2.1.1.1.0
+      register: snmp_test
+      failed_when: false
+      changed_when: false
+
+    - name: Construire le rapport
+      ansible.builtin.set_fact:
+        rapport: >-
+          {{
+            resultats_ports.results
+            | selectattr('elapsed', 'defined')
+            | map(attribute='item')
+            | list
+          }}
+
+    - name: Afficher les ports ouverts
+      ansible.builtin.debug:
+        msg: >-
+          Port {{ item.item.port }} OUVERT - {{ item.item.nom }}
+      loop: "{{ resultats_ports.results }}"
+      loop_control:
+        label: "{{ item.item.nom }}"
+      when: item.state is defined and item.state == 'started'
+
+    - name: Afficher l'etat de l'acces EWS
+      ansible.builtin.debug:
+        msg: >-
+          EWS HTTP joignable (code {{ ews_http.status | default('n/a') }}).
+          {{ 'Interface admin accessible sans redirection vers authentification.'
+             if ews_http.status | default(0) == 200
+             else 'Reponse recue, verifier si un mot de passe est demande.' }}
+      when: ews_http.status is defined
+
+    - name: Afficher l'etat SNMP
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'SNMP repond en communaute "' + snmp_community + '" - a desactiver ou changer.'
+             if snmp_test.rc == 0
+             else 'SNMP ne repond pas en communaute "' + snmp_community + '" (bon signe), ou snmpget absent.' }}
+
+    - name: Rappel
+      ansible.builtin.debug:
+        msg: >-
+          Audit en lecture seule termine. Aucune modification effectuee.
+          Voir README.md pour les recommandations.

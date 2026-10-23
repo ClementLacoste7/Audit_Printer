@@ -1,0 +1,12 @@
+# Fichiers systeme
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Sorties locales d'audit
+*.log
+rapport-*.txt
+
+# Environnements
+.venv/
+*.retry
